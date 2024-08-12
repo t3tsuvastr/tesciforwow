@@ -90,7 +90,7 @@ class WoWBot:
         
         # Convert to grayscale and threshold
         gray_health = cv2.cvtColor(health_before, cv2.COLOR_BGR2GRAY)
-        _, thresh_health = cv2.threshold(gray_health, 200, 255, cv2.THRESH_BINARY)
+        _, thresh_health = cv2.threshold(gray_health, 150, 255, cv2.THRESH_BINARY)  # Adjusted threshold
 
         # Find contours of the health bar
         contours, _ = cv2.findContours(thresh_health, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -101,6 +101,7 @@ class WoWBot:
 
         log(f"Health percentage: {health_percentage}%")
 
+        # Heal if health is below 50%
         return health_percentage < 50
 
 # Main entry point

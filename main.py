@@ -4,14 +4,14 @@ import numpy as np
 import time
 from transitions import Machine
 
-# Utility functions (can be moved to utils.py if desired)
+# служебные функции (импорт-е из utils.py)утилиты короче говоря
 def log(message):
     print(f"[{time.strftime('%H:%M:%S')}] {message}")
 
 def wait(seconds):
     time.sleep(seconds)
 
-# Game interaction functions
+# функции взаимодействия с игрой
 def capture_screen():
     screenshot = pyautogui.screenshot()
     screenshot = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
@@ -28,39 +28,45 @@ def find_template(template_path):
 def press_key(key):
     pyautogui.press(key)
 
-# Bot states and logic
-class WoWBot:
-    states = ['idle', 'searching', 'attacking']
+def right_click():
+    pyautogui.click(button='right')
+
+def move_forward():
+    pyautogui.keyDown('w')
+    wait(0.5)
+    pyautogui.keyUp('w')
+
+# состояние и логика бота
+class TestTfaiBot:
+    states = ['idle', 'moving', 'targeting', 'attacking']
 
     def __init__(self):
-        self.machine = Machine(model=self, states=WoWBot.states, initial='idle')
-        self.machine.add_transition(trigger='find_mob', source='idle', dest='searching')
-        self.machine.add_transition(trigger='attack_mob', source='searching', dest='attacking')
+        self.machine = Machine(model=self, states=TestTfaiBot.states, initial='idle')
+        self.machine.add_transition(trigger='move_to_target', source='idle', dest='moving')
+        self.machine.add_transition(trigger='target_enemy', source='moving', dest='targeting')
+        self.machine.add_transition(trigger='attack_target', source='targeting', dest='attacking')
         self.machine.add_transition(trigger='reset', source='attacking', dest='idle')
 
     def run(self):
         while True:
             if self.state == 'idle':
                 log("Bot is idle...")
-                self.find_mob()
-            elif self.state == 'searching':
-                log("Searching for mobs...")
-                if self.detect_mob():
-                    self.attack_mob()
+                self.move_to_target()
+            elif self.state == 'moving':
+                log("Moving towards target...")
+                move_forward()
+                self.target_enemy()
+            elif self.state == 'targeting':
+                log("Targeting the mob...")
+                right_click()  # авто атака
+                self.attack_target()
             elif self.state == 'attacking':
                 log("Attacking the mob...")
-                self.attack()
+                press_key('1')  # нужно здесь добавить атаки которые имеются в вовке
                 self.reset()
             wait(1)
 
-    def detect_mob(self):
-        # Placeholder for mob detection logic
-        return True  # Change this with actual detection logic
-
-    def attack(self):
-        press_key('1')  # Example attack
-
-# Main entry point
+#  мэйн вход
 if __name__ == "__main__":
-    bot = WoWBot()
+    bot = TestTfaiBot()
     bot.run()

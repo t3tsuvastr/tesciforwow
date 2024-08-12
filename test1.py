@@ -1,1 +1,3 @@
-print('Hello Adilet')
+import pyautogui
+screenshot = pyautogui.screenshot()
+screenshot.show()

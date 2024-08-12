@@ -32,27 +32,6 @@ def move_forward():
 def cycle_targets():
     pyautogui.press('tab')
 
-# Health detection
-def check_health():
-    # Capture the health bar region
-    health_bar_region = (100, 200, 150, 20)  # Adjust the region to the health bar location
-    health_before = capture_screen(health_bar_region)
-    
-    # Convert to grayscale and threshold
-    gray_health = cv2.cvtColor(health_before, cv2.COLOR_BGR2GRAY)
-    _, thresh_health = cv2.threshold(gray_health, 200, 255, cv2.THRESH_BINARY)
-
-    # Find contours of the health bar
-    contours, _ = cv2.findContours(thresh_health, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    health_area = sum(cv2.contourArea(c) for c in contours)
-    
-    # Calculate health percentage
-    health_percentage = (health_area / 10000) * 100  # Assuming the full bar is 10000 pixels in area, adjust if necessary
-
-    log(f"Health percentage: {health_percentage}%")
-
-    return health_percentage < 50
-
 def loot():
     pyautogui.moveTo(960, 540)  # Move cursor to the center of the screen (assumes loot is in the center)
     right_click()
@@ -66,7 +45,7 @@ class WoWBot:
         self.machine.add_transition(trigger='move_to_target', source='idle', dest='moving')
         self.machine.add_transition(trigger='target_enemy', source='moving', dest='targeting')
         self.machine.add_transition(trigger='attack_target', source='targeting', dest='attacking')
-        self.machine.add_transition(trigger='heal', source='attacking', dest='healing', conditions='check_health')
+        self.machine.add_transition(trigger='heal', source='attacking', dest='healing', conditions=['check_health'])
         self.machine.add_transition(trigger='loot_corpse', source='attacking', dest='looting')
         self.machine.add_transition(trigger='reset', source=['healing', 'looting'], dest='idle')
 
@@ -87,7 +66,7 @@ class WoWBot:
                 log("Attacking the mob...")
                 spell_key = str(random.randint(1, 5))  # Randomly select spell 1-5
                 press_key(spell_key)
-                if check_health():
+                if self.check_health():
                     self.heal()
                 else:
                     # Assuming the mob is killed after attack
@@ -101,6 +80,28 @@ class WoWBot:
                 loot()
                 self.reset()
             wait(1)
+
+    def check_health(self):
+        # Region of interest for the health bar based on detected coordinates
+        health_bar_region = (308, 651, 268, 114)  # Coordinates: x, y, width, height
+        
+        log(f"Checking health in region: {health_bar_region}")
+        health_before = capture_screen(health_bar_region)
+        
+        # Convert to grayscale and threshold
+        gray_health = cv2.cvtColor(health_before, cv2.COLOR_BGR2GRAY)
+        _, thresh_health = cv2.threshold(gray_health, 200, 255, cv2.THRESH_BINARY)
+
+        # Find contours of the health bar
+        contours, _ = cv2.findContours(thresh_health, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        health_area = sum(cv2.contourArea(c) for c in contours)
+        
+        # Calculate health percentage
+        health_percentage = (health_area / (268 * 114)) * 100  # Total area based on width and height
+
+        log(f"Health percentage: {health_percentage}%")
+
+        return health_percentage < 50
 
 # Main entry point
 if __name__ == "__main__":

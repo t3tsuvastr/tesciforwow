@@ -88,17 +88,23 @@ class WoWBot:
         log(f"Checking health in region: {health_bar_region}")
         health_before = capture_screen(health_bar_region)
         
-        # Convert to grayscale and threshold
-        gray_health = cv2.cvtColor(health_before, cv2.COLOR_BGR2GRAY)
-        _, thresh_health = cv2.threshold(gray_health, 150, 255, cv2.THRESH_BINARY)  # Adjusted threshold
-
-        # Find contours of the health bar
-        contours, _ = cv2.findContours(thresh_health, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        health_area = sum(cv2.contourArea(c) for c in contours)
+        # Convert the health bar region to HSV color space to better isolate the green color
+        hsv_health = cv2.cvtColor(health_before, cv2.COLOR_BGR2HSV)
         
-        # Calculate health percentage
-        health_percentage = (health_area / (268 * 114)) * 100  # Total area based on width and height
-
+        # Define the range of the green color in HSV
+        lower_green = np.array([40, 40, 40])
+        upper_green = np.array([80, 255, 255])
+        
+        # Create a mask that captures only the green color
+        mask_green = cv2.inRange(hsv_health, lower_green, upper_green)
+        
+        # Calculate the area of the green part (health bar)
+        green_area = np.sum(mask_green == 255)
+        
+        # Calculate the health percentage based on the area of the green bar
+        total_area = 268 * 114  # Total area of the health bar region
+        health_percentage = (green_area / total_area) * 100
+        
         log(f"Health percentage: {health_percentage}%")
 
         # Heal if health is below 50%

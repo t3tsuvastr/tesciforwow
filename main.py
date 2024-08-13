@@ -32,8 +32,7 @@ def release_right_mouse_button():
     pyautogui.mouseUp(button='right')
 
 def move_camera(dx, dy, duration=0.5):
-    # Smooth camera movement by scaling down the dx and dy values
-    pyautogui.moveRel(dx * 0.5, dy * 0.5, duration=duration)
+    pyautogui.moveRel(dx, dy, duration=duration)
 
 def move_forward(duration=0.5):
     pyautogui.keyDown('w')
@@ -44,48 +43,38 @@ def cycle_targets():
     pyautogui.press('tab')
 
 def loot():
-    pyautogui.moveTo(960, 540)  # Move cursor to the center of the screen (assumes loot is in the center)
+    pyautogui.moveTo(960, 540)
     right_click()
 
 def check_health():
-    # Region of interest for the health bar based on detected coordinates
-    health_bar_region = (308, 651, 268, 114)  # Coordinates: x, y, width, height
+    health_bar_region = (308, 651, 268, 114)
     
     log(f"Checking health in region: {health_bar_region}")
     health_before = capture_screen(health_bar_region)
     
-    # Convert the health bar region to HSV color space to better isolate the green color
     hsv_health = cv2.cvtColor(health_before, cv2.COLOR_BGR2HSV)
     
-    # Define the range of the green color in HSV
     lower_green = np.array([40, 40, 40])
     upper_green = np.array([80, 255, 255])
     
-    # Create a mask that captures only the green color
     mask_green = cv2.inRange(hsv_health, lower_green, upper_green)
     
-    # Calculate the area of the green part (health bar)
     green_area = np.sum(mask_green == 255)
     
-    # Calculate the health percentage based on the area of the green bar
-    total_area = 268 * 114  # Total area of the health bar region
+    total_area = 268 * 114
     health_percentage = (green_area / total_area) * 100
     
     log(f"Health percentage: {health_percentage}%")
 
-    # Heal if health is below 50%
     return health_percentage < 50
 
 def position_camera_for_loot():
     log("Positioning camera for loot...")
-    # A small forward movement to align with the lootable body
     move_forward(duration=0.3)
-    # Hold the right mouse button to adjust the camera angle
     hold_right_mouse_button()
-    move_camera(0, 50)  # Slight downward movement to ensure the body is in view
+    move_camera(0, 50)
     release_right_mouse_button()
 
-# Function to listen for the stop signal
 def stop_bot_listener(bot):
     while True:
         user_input = input("Press \\ to stop the bot: ")
@@ -94,7 +83,6 @@ def stop_bot_listener(bot):
             bot.stop()
             sys.exit()
 
-# Bot states and logic
 class WoWBot:
     states = ['idle', 'scanning', 'targeting', 'attacking', 'healing', 'looting']
 
@@ -105,7 +93,7 @@ class WoWBot:
         self.machine.add_transition(trigger='attack_target', source='targeting', dest='attacking')
         self.machine.add_transition(trigger='heal', source='attacking', dest='healing', conditions=['check_health'])
         self.machine.add_transition(trigger='loot_corpse', source='attacking', dest='looting')
-        self.machine.add_transition(trigger='reset', source=['healing', 'looting'], dest='idle')
+        self.machine.add_transition(trigger='reset', source=['healing', 'looting', 'targeting'], dest='idle')
 
     def run(self):
         while True:
@@ -114,7 +102,7 @@ class WoWBot:
                 self.scan_for_enemies()
             elif self.state == 'scanning':
                 log("Scanning for enemies...")
-                if self.detect_enemy():  # Now it's a method of the bot class
+                if self.detect_enemy():
                     self.target_enemy()
             elif self.state == 'targeting':
                 log("Targeting the mob...")
@@ -122,15 +110,14 @@ class WoWBot:
                     self.attack_target()
                 else:
                     log("Target not confirmed, retrying...")
-                    self.scan_for_enemies()
+                    self.reset()  # Reset to idle state to scan again
             elif self.state == 'attacking':
                 log("Attacking the mob...")
-                spell_key = str(random.randint(1, 5))  # Randomly select spell 1-5
+                spell_key = str(random.randint(1, 5))
                 press_key(spell_key)
                 if self.check_health():
                     self.heal()
                 else:
-                    # Assuming the mob is killed after attack
                     self.position_camera_for_loot()
                     self.loot_corpse()
             elif self.state == 'healing':
@@ -144,39 +131,28 @@ class WoWBot:
             wait(1)
 
     def detect_enemy(self):
-        # Capture the full screen
         screen = capture_screen()
 
-        # Convert the screen capture to HSV color space
         hsv_screen = cv2.cvtColor(screen, cv2.COLOR_BGR2HSV)
 
-        # Define the range of the red color (used in enemy names and health bars)
         lower_red = np.array([0, 100, 100])
         upper_red = np.array([10, 255, 255])
 
-        # Create a mask to capture red areas on the screen
         mask_red = cv2.inRange(hsv_screen, lower_red, upper_red)
 
-        # Find contours of the red areas
         contours, _ = cv2.findContours(mask_red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         if contours:
-            # Get the largest contour which is likely to be the enemy
             largest_contour = max(contours, key=cv2.contourArea)
-
-            # Get the bounding box of the contour
             x, y, w, h = cv2.boundingRect(largest_contour)
 
-            # Calculate the center of the detected area
             center_x = x + w // 2
             center_y = y + h // 2
 
             log(f"Enemy detected at ({center_x}, {center_y})")
 
-            # Move the camera to the detected enemy (center of the red area)
             hold_right_mouse_button()
 
-            # Perform smaller, smoother camera movements
             move_camera((center_x - 960) * 0.5, (center_y - 540) * 0.5)
             wait(0.1)
             move_camera((center_x - 960) * 0.5, (center_y - 540) * 0.5)
@@ -189,19 +165,16 @@ class WoWBot:
             return False
 
     def confirm_target(self):
-        # Region where the red border and HP bar appear
-        screen_region = (1520, 860, 300, 80)  # Accurate coordinates based on the screenshot
+        screen_region = (1520, 860, 300, 80)
         screen = capture_screen(screen_region)
 
-        # Convert to HSV and create a mask for red color
         hsv_screen = cv2.cvtColor(screen, cv2.COLOR_BGR2HSV)
         lower_red = np.array([0, 100, 100])
         upper_red = np.array([10, 255, 255])
         mask_red = cv2.inRange(hsv_screen, lower_red, upper_red)
 
-        # Check if red border and health bar are detected
         red_area = np.sum(mask_red == 255)
-        if red_area > 1000:  # Threshold for detection
+        if red_area > 1000:
             log("Target confirmed with red border and HP bar")
             return True
         else:
@@ -214,10 +187,8 @@ class WoWBot:
 if __name__ == "__main__":
     bot = WoWBot()
 
-    # Start the stop listener in a separate thread
     stop_thread = threading.Thread(target=stop_bot_listener, args=(bot,))
     stop_thread.daemon = True
     stop_thread.start()
 
-    # Run the bot
     bot.run()

@@ -173,7 +173,7 @@ class WoWBot:
                 self.scan_for_enemies()
             elif self.state == 'scanning':
                 log("Scanning for enemies...")
-                if self.detect_enemy():
+                if detect_enemy():  # Corrected method reference
                     self.target_enemy()
             elif self.state == 'targeting':
                 log("Targeting the mob...")

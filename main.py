@@ -101,7 +101,7 @@ class WoWBot:
     def __init__(self):
         self.machine = Machine(model=self, states=WoWBot.states, initial='idle')
         self.machine.add_transition(trigger='scan_for_enemies', source='idle', dest='scanning')
-        self.machine.add_transition(trigger='target_enemy', source='scanning', dest='targeting', conditions=['confirm_target'])
+        self.machine.add_transition(trigger='target_enemy', source='scanning', dest='targeting', conditions=['detect_enemy'])
         self.machine.add_transition(trigger='attack_target', source='targeting', dest='attacking')
         self.machine.add_transition(trigger='heal', source='attacking', dest='healing', conditions=['check_health'])
         self.machine.add_transition(trigger='loot_corpse', source='attacking', dest='looting')
@@ -114,10 +114,15 @@ class WoWBot:
                 self.scan_for_enemies()
             elif self.state == 'scanning':
                 log("Scanning for enemies...")
-                self.move_and_scan()
+                if self.detect_enemy():  # Now it's a method of the bot class
+                    self.target_enemy()
             elif self.state == 'targeting':
                 log("Targeting the mob...")
-                self.attack_target()
+                if self.confirm_target():
+                    self.attack_target()
+                else:
+                    log("Target not confirmed, retrying...")
+                    self.scan_for_enemies()
             elif self.state == 'attacking':
                 log("Attacking the mob...")
                 spell_key = str(random.randint(1, 5))  # Randomly select spell 1-5
@@ -138,17 +143,54 @@ class WoWBot:
                 self.reset()
             wait(1)
 
-    def move_and_scan(self):
-        move_forward(duration=0.5)
-        cycle_targets()
-        if self.confirm_target():
-            self.target_enemy()
+    def detect_enemy(self):
+        # Capture the full screen
+        screen = capture_screen()
+
+        # Convert the screen capture to HSV color space
+        hsv_screen = cv2.cvtColor(screen, cv2.COLOR_BGR2HSV)
+
+        # Define the range of the red color (used in enemy names and health bars)
+        lower_red = np.array([0, 100, 100])
+        upper_red = np.array([10, 255, 255])
+
+        # Create a mask to capture red areas on the screen
+        mask_red = cv2.inRange(hsv_screen, lower_red, upper_red)
+
+        # Find contours of the red areas
+        contours, _ = cv2.findContours(mask_red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        if contours:
+            # Get the largest contour which is likely to be the enemy
+            largest_contour = max(contours, key=cv2.contourArea)
+
+            # Get the bounding box of the contour
+            x, y, w, h = cv2.boundingRect(largest_contour)
+
+            # Calculate the center of the detected area
+            center_x = x + w // 2
+            center_y = y + h // 2
+
+            log(f"Enemy detected at ({center_x}, {center_y})")
+
+            # Move the camera to the detected enemy (center of the red area)
+            hold_right_mouse_button()
+
+            # Perform smaller, smoother camera movements
+            move_camera((center_x - 960) * 0.5, (center_y - 540) * 0.5)
+            wait(0.1)
+            move_camera((center_x - 960) * 0.5, (center_y - 540) * 0.5)
+
+            release_right_mouse_button()
+
+            return True
         else:
-            log("No valid target detected, continue scanning...")
+            log("No enemies detected")
+            return False
 
     def confirm_target(self):
         # Region where the red border and HP bar appear
-        screen_region = (1500, 875, 275, 70)  # Accurate coordinates based on the screenshot
+        screen_region = (1520, 860, 300, 80)  # Accurate coordinates based on the screenshot
         screen = capture_screen(screen_region)
 
         # Convert to HSV and create a mask for red color

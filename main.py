@@ -31,8 +31,9 @@ def hold_right_mouse_button():
 def release_right_mouse_button():
     pyautogui.mouseUp(button='right')
 
-def move_camera(dx, dy, duration=0.2):
-    pyautogui.moveRel(dx, dy, duration=duration)
+def move_camera(dx, dy, duration=0.5):
+    # Smooth camera movement by scaling down the dx and dy values
+    pyautogui.moveRel(dx * 0.5, dy * 0.5, duration=duration)
 
 def move_forward(duration=0.5):
     pyautogui.keyDown('w')
@@ -145,41 +146,66 @@ class WoWBot:
     def detect_enemy(self):
         # Capture the full screen
         screen = capture_screen()
-        
+
         # Convert the screen capture to HSV color space
         hsv_screen = cv2.cvtColor(screen, cv2.COLOR_BGR2HSV)
-        
+
         # Define the range of the red color (used in enemy names and health bars)
         lower_red = np.array([0, 100, 100])
         upper_red = np.array([10, 255, 255])
-        
+
         # Create a mask to capture red areas on the screen
         mask_red = cv2.inRange(hsv_screen, lower_red, upper_red)
-        
+
         # Find contours of the red areas
         contours, _ = cv2.findContours(mask_red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
+
         if contours:
             # Get the largest contour which is likely to be the enemy
             largest_contour = max(contours, key=cv2.contourArea)
-            
+
             # Get the bounding box of the contour
             x, y, w, h = cv2.boundingRect(largest_contour)
-            
+
             # Calculate the center of the detected area
             center_x = x + w // 2
             center_y = y + h // 2
-            
+
             log(f"Enemy detected at ({center_x}, {center_y})")
-            
+
             # Move the camera to the detected enemy (center of the red area)
             hold_right_mouse_button()
-            move_camera(center_x - 960, center_y - 540)  # Centering the detected enemy
+
+            # Perform smaller, smoother camera movements
+            move_camera((center_x - 960) * 0.5, (center_y - 540) * 0.5)
+            wait(0.1)
+            move_camera((center_x - 960) * 0.5, (center_y - 540) * 0.5)
+
             release_right_mouse_button()
-            
+
             return True
         else:
             log("No enemies detected")
+            return False
+
+    def confirm_target(self):
+        # Region where the red border and HP bar appear
+        screen_region = (1500, 875, 275, 70)  # Accurate coordinates based on the screenshot
+        screen = capture_screen(screen_region)
+
+        # Convert to HSV and create a mask for red color
+        hsv_screen = cv2.cvtColor(screen, cv2.COLOR_BGR2HSV)
+        lower_red = np.array([0, 100, 100])
+        upper_red = np.array([10, 255, 255])
+        mask_red = cv2.inRange(hsv_screen, lower_red, upper_red)
+
+        # Check if red border and health bar are detected
+        red_area = np.sum(mask_red == 255)
+        if red_area > 1000:  # Threshold for detection
+            log("Target confirmed with red border and HP bar")
+            return True
+        else:
+            log("Target not confirmed")
             return False
 
     def stop(self):
@@ -187,11 +213,11 @@ class WoWBot:
 
 if __name__ == "__main__":
     bot = WoWBot()
-    
+
     # Start the stop listener in a separate thread
     stop_thread = threading.Thread(target=stop_bot_listener, args=(bot,))
     stop_thread.daemon = True
     stop_thread.start()
-    
+
     # Run the bot
     bot.run()

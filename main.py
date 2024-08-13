@@ -46,66 +46,6 @@ def loot():
     pyautogui.moveTo(960, 540)  # Move cursor to the center of the screen (assumes loot is in the center)
     right_click()
 
-def detect_enemy():
-    # Capture the full screen
-    screen = capture_screen()
-    
-    # Convert the screen capture to HSV color space
-    hsv_screen = cv2.cvtColor(screen, cv2.COLOR_BGR2HSV)
-    
-    # Define the range of the red color (used in enemy names and health bars)
-    lower_red = np.array([0, 100, 100])
-    upper_red = np.array([10, 255, 255])
-    
-    # Create a mask to capture red areas on the screen
-    mask_red = cv2.inRange(hsv_screen, lower_red, upper_red)
-    
-    # Find contours of the red areas
-    contours, _ = cv2.findContours(mask_red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
-    if contours:
-        # Get the largest contour which is likely to be the enemy
-        largest_contour = max(contours, key=cv2.contourArea)
-        
-        # Get the bounding box of the contour
-        x, y, w, h = cv2.boundingRect(largest_contour)
-        
-        # Calculate the center of the detected area
-        center_x = x + w // 2
-        center_y = y + h // 2
-        
-        log(f"Enemy detected at ({center_x}, {center_y})")
-        
-        # Move the camera to the detected enemy (center of the red area)
-        hold_right_mouse_button()
-        move_camera(center_x - 960, center_y - 540)  # Centering the detected enemy
-        release_right_mouse_button()
-        
-        return True
-    else:
-        log("No enemies detected")
-        return False
-
-def confirm_target():
-    # Region where the red border and HP bar appear
-    screen_region = (1500, 875, 275, 70)  # Accurate coordinates based on the screenshot
-    screen = capture_screen(screen_region)
-    
-    # Convert to HSV and create a mask for red color
-    hsv_screen = cv2.cvtColor(screen, cv2.COLOR_BGR2HSV)
-    lower_red = np.array([0, 100, 100])
-    upper_red = np.array([10, 255, 255])
-    mask_red = cv2.inRange(hsv_screen, lower_red, upper_red)
-    
-    # Check if red border and health bar are detected
-    red_area = np.sum(mask_red == 255)
-    if red_area > 1000:  # Threshold for detection
-        log("Target confirmed with red border and HP bar")
-        return True
-    else:
-        log("Target not confirmed")
-        return False
-
 def check_health():
     # Region of interest for the health bar based on detected coordinates
     health_bar_region = (308, 651, 268, 114)  # Coordinates: x, y, width, height
@@ -173,7 +113,7 @@ class WoWBot:
                 self.scan_for_enemies()
             elif self.state == 'scanning':
                 log("Scanning for enemies...")
-                if detect_enemy():  # Corrected method reference
+                if self.detect_enemy():  # Now it's a method of the bot class
                     self.target_enemy()
             elif self.state == 'targeting':
                 log("Targeting the mob...")
@@ -201,6 +141,46 @@ class WoWBot:
                 loot()
                 self.reset()
             wait(1)
+
+    def detect_enemy(self):
+        # Capture the full screen
+        screen = capture_screen()
+        
+        # Convert the screen capture to HSV color space
+        hsv_screen = cv2.cvtColor(screen, cv2.COLOR_BGR2HSV)
+        
+        # Define the range of the red color (used in enemy names and health bars)
+        lower_red = np.array([0, 100, 100])
+        upper_red = np.array([10, 255, 255])
+        
+        # Create a mask to capture red areas on the screen
+        mask_red = cv2.inRange(hsv_screen, lower_red, upper_red)
+        
+        # Find contours of the red areas
+        contours, _ = cv2.findContours(mask_red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        if contours:
+            # Get the largest contour which is likely to be the enemy
+            largest_contour = max(contours, key=cv2.contourArea)
+            
+            # Get the bounding box of the contour
+            x, y, w, h = cv2.boundingRect(largest_contour)
+            
+            # Calculate the center of the detected area
+            center_x = x + w // 2
+            center_y = y + h // 2
+            
+            log(f"Enemy detected at ({center_x}, {center_y})")
+            
+            # Move the camera to the detected enemy (center of the red area)
+            hold_right_mouse_button()
+            move_camera(center_x - 960, center_y - 540)  # Centering the detected enemy
+            release_right_mouse_button()
+            
+            return True
+        else:
+            log("No enemies detected")
+            return False
 
     def stop(self):
         log("Bot has stopped.")

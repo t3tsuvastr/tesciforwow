@@ -34,16 +34,6 @@ def move_forward():
 def cycle_targets():
     pyautogui.press('tab')
 
-# Function to detect the HP bar
-def detect_hp_bar():
-    screen_capture = capture_screen(region=hp_bar_region)
-    hsv_capture = cv2.cvtColor(screen_capture, cv2.COLOR_BGR2HSV)
-    lower_green = np.array([40, 40, 40])
-    upper_green = np.array([80, 255, 255])
-    mask_green = cv2.inRange(hsv_capture, lower_green, upper_green)
-    green_area = np.sum(mask_green == 255)
-    return green_area > 0
-
 # Bot states and logic
 class WoWBot:
     states = ['idle', 'moving', 'targeting', 'attacking', 'healing']
@@ -92,8 +82,28 @@ class WoWBot:
         # Dummy health check function (replace with actual logic)
         return False
 
+    def detect_hp_bar(self):
+        # Capture the screen in the defined region
+        screen_capture = capture_screen(region=hp_bar_region)
+        
+        # Convert to HSV color space
+        hsv_capture = cv2.cvtColor(screen_capture, cv2.COLOR_BGR2HSV)
+        
+        # Define the green color range for the HP bar in HSV
+        lower_green = np.array([40, 40, 40])
+        upper_green = np.array([80, 255, 255])
+        
+        # Create a mask for the green color
+        mask_green = cv2.inRange(hsv_capture, lower_green, upper_green)
+        
+        # Calculate the area of the green part (HP bar)
+        green_area = np.sum(mask_green == 255)
+        
+        # Return True if the green area is present, indicating the HP bar is detected
+        return green_area > 0
+
 if __name__ == "__main__":
     bot = WoWBot()
     bot.run()
 
-print('nohting')
+print('ss')

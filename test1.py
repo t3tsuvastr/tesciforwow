@@ -1,6 +1,6 @@
-import pyautogui
 import cv2
 import numpy as np
+import pyautogui
 import time
 import random
 from transitions import Machine
@@ -89,9 +89,9 @@ class WoWBot:
         # Convert to HSV color space
         hsv_capture = cv2.cvtColor(screen_capture, cv2.COLOR_BGR2HSV)
         
-        # Define the green color range for the HP bar in HSV
-        lower_green = np.array([40, 40, 40])
-        upper_green = np.array([80, 255, 255])
+        # Define the green color range for the HP bar in HSV based on analysis
+        lower_green = np.array([25, 150, 70])
+        upper_green = np.array([40, 255, 130])
         
         # Create a mask for the green color
         mask_green = cv2.inRange(hsv_capture, lower_green, upper_green)
@@ -106,4 +106,4 @@ if __name__ == "__main__":
     bot = WoWBot()
     bot.run()
 
-print('ss')
+print()

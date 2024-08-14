@@ -1,129 +1,49 @@
-import pyautogui
-import time
 import cv2
 import numpy as np
-from transitions import Machine
-from threading import Thread
-import keyboard
+import pyautogui
+import time
 
-class WoWBot:
-    states = ['idle', 'scanning', 'targeting', 'attacking', 'looting']
+# Define the region where the HP bar appears (using the exact coordinates)
+hp_bar_region = (1570, 1010, 225, 25)
 
-    def __init__(self):
-        self.machine = Machine(model=self, states=WoWBot.states, initial='idle')
-        self.machine.add_transition(trigger='scan_for_enemies', source='idle', dest='scanning')
-        self.machine.add_transition(trigger='target_enemy', source='scanning', dest='targeting')
-        self.machine.add_transition(trigger='attack_enemy', source='targeting', dest='attacking')
-        self.machine.add_transition(trigger='loot_enemy', source='attacking', dest='looting')
-        self.machine.add_transition(trigger='reset_to_idle', source='*', dest='idle')
-        self.stop_bot = False
+# Utility function to capture the screen
+def capture_screen(region=None):
+    screenshot = pyautogui.screenshot(region=region)
+    screenshot = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
+    return screenshot
 
-    def run(self):
-        def listen_for_stop():
-            while True:
-                if keyboard.is_pressed('\\'):
-                    print("Stopping bot...")
-                    self.stop_bot = True
-                    break
+# Function to log messages with timestamps
+def log(message):
+    print(f"[{time.strftime('%H:%M:%S')}] {message}")
 
-        stop_thread = Thread(target=listen_for_stop)
-        stop_thread.start()
-
-        while not self.stop_bot:
-            if self.state == 'idle':
-                self.scan_for_enemies()
-            elif self.state == 'scanning':
-                if self.detect_enemy():
-                    self.target_enemy()
-                else:
-                    self.reset_to_idle()
-            elif self.state == 'targeting':
-                if self.is_enemy_targeted():
-                    self.attack_enemy()
-                else:
-                    self.reset_to_idle()
-            elif self.state == 'attacking':
-                if self.is_enemy_dead():
-                    self.loot_enemy()
-                else:
-                    self.reset_to_idle()
-            elif self.state == 'looting':
-                self.reset_to_idle()
-            time.sleep(0.1)  # Small delay to prevent excessive CPU usage
-
-        stop_thread.join()
-
-    def detect_enemy(self):
-        print("[DEBUG] Detecting enemy...")
-        # Capture the screen
-        screen = self.capture_screen()
+# Function to detect the HP bar
+def detect_hp_bar():
+    while True:
+        # Capture the screen in the defined region
+        screen_capture = capture_screen(region=hp_bar_region)
         
-        # Convert the screenshot to grayscale
-        gray_screen = cv2.cvtColor(screen, cv2.COLOR_BGR2GRAY)
+        # Convert to HSV color space
+        hsv_capture = cv2.cvtColor(screen_capture, cv2.COLOR_BGR2HSV)
         
-        # Use a basic threshold to identify red borders around enemies
-        _, thresh = cv2.threshold(gray_screen, 127, 255, cv2.THRESH_BINARY_INV)
+        # Define the green color range for the HP bar in HSV
+        lower_green = np.array([40, 40, 40])
+        upper_green = np.array([80, 255, 255])
         
-        # Find contours that may represent the red border of the enemy's HP bar
-        contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        # Create a mask for the green color
+        mask_green = cv2.inRange(hsv_capture, lower_green, upper_green)
         
-        for cnt in contours:
-            x, y, w, h = cv2.boundingRect(cnt)
-            # Assume the red border is a rectangle within a specific size range
-            if 30 < w < 150 and 10 < h < 50:
-                center_x, center_y = x + w // 2, y + h // 2
-                print(f"[DEBUG] Enemy detected at ({center_x}, {center_y})")
-                self.move_camera(center_x - 960, center_y - 540)  # Centering the detected enemy
-                return True
+        # Calculate the area of the green part (HP bar)
+        green_area = np.sum(mask_green == 255)
         
-        return False
-
-    def is_enemy_targeted(self):
-        print("[DEBUG] Checking if enemy is targeted...")
-        # Check if the red HP bar is locked on the bottom of the screen
-        screen_region = (1500, 850, 400, 200)  # Adjust these coordinates based on your screen resolution
-        screen = self.capture_screen(screen_region)
-        hsv_screen = cv2.cvtColor(screen, cv2.COLOR_BGR2HSV)
-        lower_red = np.array([0, 100, 100])
-        upper_red = np.array([10, 255, 255])
-        mask = cv2.inRange(hsv_screen, lower_red, upper_red)
+        # If green area is above a certain threshold, the HP bar is present
+        if green_area > 0:
+            log("HP bar detected!")
+        else:
+            log("HP bar not detected.")
         
-        if np.sum(mask) > 0:
-            print("[DEBUG] Target confirmed.")
-            return True
-        
-        print("[DEBUG] No target found.")
-        return False
+        # Pause briefly before the next check
+        time.sleep(0.5)
 
-    def is_enemy_dead(self):
-        print("[DEBUG] Checking if enemy is dead...")
-        # Implement logic to check if the enemy is dead
-        time.sleep(1)
-        return True
-
-    def move_camera(self, dx, dy, duration=0.5):
-        self.hold_right_mouse_button()
-        pyautogui.moveRel(dx * 0.2, dy * 0.2, duration=duration)
-        self.release_right_mouse_button()
-
-    def hold_right_mouse_button(self):
-        pyautogui.mouseDown(button='right')
-
-    def release_right_mouse_button(self):
-        pyautogui.mouseUp(button='right')
-
-    def capture_screen(self, region=None):
-        screenshot = pyautogui.screenshot(region=region)
-        screen = np.array(screenshot)
-        screen = cv2.cvtColor(screen, cv2.COLOR_RGB2BGR)
-        return screen
-
-    def loot_enemy(self):
-        print("[DEBUG] Looting enemy...")
-        time.sleep(1)
-        self.reset_to_idle()
-
-# Instantiate and run the bot
+# Main entry point to start the detection
 if __name__ == "__main__":
-    bot = WoWBot()
-    bot.run()
+    detect_hp_bar()
